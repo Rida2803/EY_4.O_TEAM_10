@@ -1,0 +1,48 @@
+{% extends "tracker/base.html" %}
+
+{% block title %}Manage Monthly Budget{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-5">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-transparent">
+                <h5 class="mb-0">Monthly Budget</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Month</label>
+                        {{ form.month }}
+                        {% if form.month.errors %}
+                            <div class="text-danger small">{{ form.month.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Year</label>
+                        {{ form.year }}
+                        {% if form.year.errors %}
+                            <div class="text-danger small">{{ form.year.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Budget Amount</label>
+                        {{ form.budget_amount }}
+                        {% if form.budget_amount.errors %}
+                            <div class="text-danger small">{{ form.budget_amount.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'tracker:dashboard' %}" class="btn btn-outline-secondary">
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">Save Budget</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

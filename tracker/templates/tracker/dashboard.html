@@ -1,0 +1,187 @@
+{% extends "tracker/base.html" %}
+
+{% block title %}Dashboard | Student Budget Tracker{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Total Income</h6>
+                <h3 class="card-title text-success">
+                    <i class="bi bi-arrow-down-circle me-1"></i>₹{{ income_total }}
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Total Expense</h6>
+                <h3 class="card-title text-danger">
+                    <i class="bi bi-arrow-up-circle me-1"></i>₹{{ expense_total }}
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Current Balance</h6>
+                <h3 class="card-title {% if current_balance >= 0 %}text-primary{% else %}text-danger{% endif %}">
+                    <i class="bi bi-cash-coin me-1"></i>₹{{ current_balance }}
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Monthly Budget Usage</h5>
+                {% if monthly_budget %}
+                    <span class="badge bg-secondary">{{ monthly_budget.period_label }}</span>
+                {% else %}
+                    <span class="badge bg-warning text-dark">No Budget Set</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if monthly_budget %}
+                    <p class="mb-1">
+                        <strong>Budget:</strong> ₹{{ monthly_budget.budget_amount }}
+                    </p>
+                    <p class="mb-2">
+                        <strong>Expenses this month:</strong> ₹{{ month_expenses }}
+                    </p>
+                    <div class="progress mb-2" style="height: 20px;">
+                        {% with usage=budget_usage_percentage %}
+                            <div class="progress-bar
+                                        {% if usage < 70 %}
+                                            bg-success
+                                        {% elif usage < 100 %}
+                                            bg-warning
+                                        {% else %}
+                                            bg-danger
+                                        {% endif %}"
+                                 role="progressbar"
+                                 style="width: {{ usage|floatformat:0 }}%;"
+                                 aria-valuenow="{{ usage|floatformat:0 }}"
+                                 aria-valuemin="0" aria-valuemax="100">
+                                {{ usage|floatformat:0 }}%
+                            </div>
+                        {% endwith %}
+                    </div>
+                    {% if budget_exceeded %}
+                        <div class="alert alert-danger mb-0">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                            You have exceeded your monthly budget!
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <p class="mb-2">No budget set for this month.</p>
+                    <a href="{% url 'tracker:manage_budget' %}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-circle me-1"></i>Set Monthly Budget
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Recent Transactions</h5>
+                <a href="{% url 'tracker:transaction_add' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Add Transaction
+                </a>
+            </div>
+            <div class="card-body table-responsive">
+                {% if latest_transactions %}
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Category</th>
+                            <th>Description</th>
+                            <th class="text-end">Amount</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for tx in latest_transactions %}
+                            <tr>
+                                <td>{{ tx.date|date:"M d, Y" }}</td>
+                                <td>
+                                    {% if tx.type == "INCOME" %}
+                                        <span class="badge bg-success">Income</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Expense</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ tx.get_category_display }}</td>
+                                <td>{{ tx.description|default:"-" }}</td>
+                                <td class="text-end">
+                                    {% if tx.type == "INCOME" %}
+                                        <span class="text-success">+₹{{ tx.amount }}</span>
+                                    {% else %}
+                                        <span class="text-danger">-₹{{ tx.amount }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <a href="{% url 'tracker:transaction_edit' tx.pk %}"
+                                       class="btn btn-sm btn-link text-secondary">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </a>
+                                    <a href="{% url 'tracker:transaction_delete' tx.pk %}"
+                                       class="btn btn-sm btn-link text-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="mb-0 text-muted">No transactions yet. Start by adding one.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-transparent">
+                <h5 class="mb-0">Smart Spending Advisor</h5>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted">
+                    Enter a planned spending amount to see if it is safe based on your current balance.
+                </p>
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        {{ smart_form.planned_amount.label_tag }}
+                        {{ smart_form.planned_amount }}
+                        {% if smart_form.planned_amount.errors %}
+                            <div class="text-danger small">
+                                {{ smart_form.planned_amount.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-calculator me-1"></i>Check Advice
+                    </button>
+                </form>
+
+                {% if advisor_result %}
+                    <div class="alert alert-{{ advisor_status }} mt-3 mb-0">
+                        {{ advisor_result }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

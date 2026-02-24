@@ -1,0 +1,13 @@
+{% extends "tracker/base.html" %}
+
+{% block title %}Logged Out{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+    <h3>You have been logged out.</h3>
+    <p class="mt-3">
+        <a href="{% url 'login' %}" class="btn btn-primary">Login again</a>
+    </p>
+</div>
+{% endblock %}
+

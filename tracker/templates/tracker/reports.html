@@ -1,0 +1,114 @@
+{% extends "tracker/base.html" %}
+
+{% block title %}Reports | Student Budget Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-transparent">
+                <h5 class="mb-0">Filter</h5>
+            </div>
+            <div class="card-body">
+                <form method="get">
+                    <div class="mb-3">
+                        <label class="form-label">Month (1-12)</label>
+                        {{ filter_form.month }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Year</label>
+                        {{ filter_form.year }}
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-funnel me-1"></i>Apply Filters
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Total Income</h6>
+                        <h3 class="text-success mb-0">₹{{ total_income }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Total Expense</h6>
+                        <h3 class="text-danger mb-0">₹{{ total_expense }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-2">
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                        <span>Expense Categories</span>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="expenseCategoryChart"
+                                data-labels='{{ category_labels_json|safe }}'
+                                data-values='{{ category_values_json|safe }}'
+                                height="220"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                        <span>Income vs Expense</span>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="incomeExpenseChart"
+                                data-labels='{{ income_expense_labels_json|safe }}'
+                                data-values='{{ income_expense_values_json|safe }}'
+                                height="220"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-transparent">
+        <h5 class="mb-0">Recent Transactions (up to 50)</h5>
+    </div>
+    <div class="card-body table-responsive">
+        {% if transactions %}
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th class="text-end">Amount</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for tx in transactions %}
+                    <tr>
+                        <td>{{ tx.date|date:"M d, Y" }}</td>
+                        <td>{{ tx.get_type_display }}</td>
+                        <td>{{ tx.get_category_display }}</td>
+                        <td>{{ tx.description|default:"-" }}</td>
+                        <td class="text-end">₹{{ tx.amount }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="mb-0 text-muted">No transactions for the selected period.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
