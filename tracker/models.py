@@ -92,14 +92,13 @@ class SavingsGoal(models.Model):
         return max((self.end_date - timezone.now().date()).days, 0)
 
     def required_monthly_saving(self) -> "decimal.Decimal":
-        from decimal import Decimal
+        from decimal import Decimal, ROUND_HALF_UP
 
         remaining_days = self.days_remaining
         if remaining_days <= 0:
             return Decimal("0.00")
-        months_remaining = Decimal(remaining_days) / Decimal(30)
-        if months_remaining <= 0:
-            months_remaining = Decimal(1)
+        # compute months remaining as integer number of 30-day periods (ceil), at least 1
+        months_count = max((remaining_days + 29) // 30, 1)
         # compute amount already saved towards goal
         saved = (
             self.user.transactions.filter(type=Transaction.INCOME, date__gte=self.start_date)
@@ -110,8 +109,24 @@ class SavingsGoal(models.Model):
             .aggregate(total=models.Sum("amount"))["total"]
             or Decimal("0.00")
         )
-        remaining = max(self.target_amount - saved, Decimal("0.00"))
-        return (remaining / months_remaining).quantize(Decimal("0.01"))
+        # normalize types to Decimal to avoid issues when values are strings
+        target = Decimal(str(self.target_amount))
+        saved = Decimal(saved)
+        remaining = target - saved
+        if remaining <= Decimal("0.00"):
+            return Decimal("0.00")
+        # divide by integer month count to avoid Decimal division edge-cases
+        per_month = remaining / Decimal(months_count)
+        from decimal import InvalidOperation
+        try:
+            return per_month.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        except InvalidOperation:
+            # Fallback: convert to float and round, then to Decimal
+            try:
+                val = float(per_month)
+            except Exception:
+                return Decimal("0.00")
+            return Decimal(str(round(val, 2)))
 
 
 class AchievementBadge(models.Model):
