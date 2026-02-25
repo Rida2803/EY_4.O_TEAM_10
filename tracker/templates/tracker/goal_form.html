@@ -1,0 +1,39 @@
+{% extends "tracker/base.html" %}
+
+{% block title %}Create Savings Goal{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent">
+                <h5 class="mb-0">Create Savings Goal</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {{ form.non_field_errors }}
+                    <div class="mb-3">
+                        {{ form.name.label_tag }}
+                        {{ form.name }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.target_amount.label_tag }}
+                        {{ form.target_amount }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.start_date.label_tag }}
+                        {{ form.start_date }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.end_date.label_tag }}
+                        {{ form.end_date }}
+                    </div>
+                    <button class="btn btn-primary">Create Goal</button>
+                    <a href="{% url 'tracker:dashboard' %}" class="btn btn-link">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

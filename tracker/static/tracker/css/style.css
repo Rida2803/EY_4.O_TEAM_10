@@ -2,8 +2,23 @@ body {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+:root {
+    --bg: #f8fafc;
+    --card-bg: rgba(255,255,255,0.7);
+    --glass: rgba(255,255,255,0.6);
+}
+
+.dark {
+    --bg: #0b1220;
+    --card-bg: rgba(12,18,28,0.7);
+    --glass: rgba(255,255,255,0.03);
+    color: #e6eef8;
+}
+
 .card {
     border-radius: 0.75rem;
+    background: var(--card-bg);
+    backdrop-filter: blur(6px);
 }
 
 .card-header {
@@ -22,6 +37,16 @@ body {
 .btn-primary:hover {
     background: linear-gradient(90deg, #1d4ed8, #1e40af);
     border-color: #1e40af;
+}
+
+.glass {
+    background: var(--glass);
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+}
+
+.animated-counter {
+    transition: all 0.8s ease;
 }
 
 .progress {

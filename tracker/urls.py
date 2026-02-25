@@ -6,6 +6,7 @@ app_name = "tracker"
 
 urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
+    path("goals/add/", views.SavingsGoalCreateView.as_view(), name="goal_add"),
     path("transactions/add/", views.TransactionCreateView.as_view(), name="transaction_add"),
     path(
         "transactions/<int:pk>/edit/",

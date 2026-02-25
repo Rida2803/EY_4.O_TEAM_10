@@ -2,11 +2,19 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
-from .models import Transaction, MonthlyBudget
+from .models import Transaction, MonthlyBudget, SavingsGoal
 
 
 class UserRegistrationForm(UserCreationForm):
     email = forms.EmailField(required=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Apply Bootstrap form-control classes to all fields for consistent alignment
+        self.fields["username"].widget.attrs.update({"class": "form-control"})
+        self.fields["email"].widget.attrs.update({"class": "form-control"})
+        self.fields["password1"].widget.attrs.update({"class": "form-control"})
+        self.fields["password2"].widget.attrs.update({"class": "form-control"})
 
     class Meta:
         model = User
@@ -74,11 +82,22 @@ class ReportFilterForm(forms.Form):
             attrs={"class": "form-control", "placeholder": "Month (1-12)"}
         ),
     )
-    year = forms.IntegerField(
-        required=False,
-        min_value=2000,
-        widget=forms.NumberInput(
-            attrs={"class": "form-control", "placeholder": "Year (e.g. 2026)"}
-        ),
-    )
+
+
+class SavingsGoalForm(forms.ModelForm):
+    class Meta:
+        model = SavingsGoal
+        fields = ["name", "target_amount", "start_date", "end_date"]
+
+    def __init__(self, *args, **kwargs):
+        # import model lazily to avoid circular import at module load
+        from .models import SavingsGoal
+
+        super().__init__(*args, **kwargs)
+        self._meta.model = SavingsGoal
+        self.fields["name"].widget.attrs.update({"class": "form-control"})
+        self.fields["target_amount"].widget.attrs.update({"class": "form-control", "step": "0.01"})
+        self.fields["start_date"].widget.attrs.update({"class": "form-control", "type": "date"})
+        self.fields["end_date"].widget.attrs.update({"class": "form-control", "type": "date"})
+    
 

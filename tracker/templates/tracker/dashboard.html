@@ -36,6 +36,71 @@
     </div>
 </div>
 
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">Financial Health Score</h6>
+                <canvas id="healthScoreChart" width="160" height="160" data-score="{{ health_score }}" data-label="{{ health_label }}" data-color="{{ health_color }}"></canvas>
+                <h5 class="mt-2">{{ health_label }} (<strong>{{ health_score|floatformat:0 }}</strong>)</h5>
+                <p class="small text-muted mb-1">Personalized suggestions:</p>
+                <ul class="small text-start">
+                    {% for s in health_suggestions %}
+                        <li>{{ s }}</li>
+                    {% empty %}
+                        <li>Keep up the good work — no immediate suggestions.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Projected Next Month</h6>
+                <p class="mb-1"><strong>Income:</strong> ₹{{ predicted_income }}</p>
+                <p class="mb-1"><strong>Expenses:</strong> ₹{{ predicted_expense }}</p>
+                <p class="mb-2"><strong>Projected Balance:</strong> ₹{{ predicted_balance }}</p>
+                <canvas id="projectedBalanceChart" width="320" height="120" data-predicted="{{ predicted_balance }}"></canvas>
+                {% if predicted_balance < 0 %}
+                    <div class="alert alert-danger mt-2 mb-0">Projected balance is negative — consider cutting expenses.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Badges</h6>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div>
+                        {% for b in badges %}
+                            <span class="badge bg-info text-dark me-1 mb-1">{{ b.get_badge_display }}</span>
+                        {% empty %}
+                            <p class="small text-muted mb-0">No badges yet — achieve milestones to earn badges.</p>
+                        {% endfor %}
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#goalModal">Add Goal</button>
+                    </div>
+                </div>
+                    {% if goal_info %}
+                    <hr />
+                    <h6 class="mb-1">Active Goal: {{ goal_info.name }}</h6>
+                    <p class="small mb-1">Target: ₹{{ goal_info.target }} — Days left: {{ goal_info.days_remaining }}</p>
+                    <p class="small mb-1">Required monthly: ₹{{ goal_info.required_monthly }}</p>
+                    <p class="small mb-1">Saved: ₹{{ goal_info.saved }}</p>
+                    <div class="progress" style="height:10px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ goal_info.progress_pct|floatformat:0 }}%;" aria-valuenow="{{ goal_info.progress_pct|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                    <p class="small mt-1">Progress: {{ goal_info.progress_pct|floatformat:0 }}%</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="card shadow-sm border-0 mb-4">
@@ -183,5 +248,9 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+    {% include 'tracker/partials/goal_modal.html' %}
 {% endblock %}
 
