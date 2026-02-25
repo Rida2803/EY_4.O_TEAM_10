@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 
 class Transaction(models.Model):
@@ -91,9 +92,7 @@ class SavingsGoal(models.Model):
     def days_remaining(self) -> int:
         return max((self.end_date - timezone.now().date()).days, 0)
 
-    def required_monthly_saving(self) -> "decimal.Decimal":
-        from decimal import Decimal, ROUND_HALF_UP
-
+    def required_monthly_saving(self) -> Decimal:
         remaining_days = self.days_remaining
         if remaining_days <= 0:
             return Decimal("0.00")
@@ -117,7 +116,6 @@ class SavingsGoal(models.Model):
             return Decimal("0.00")
         # divide by integer month count to avoid Decimal division edge-cases
         per_month = remaining / Decimal(months_count)
-        from decimal import InvalidOperation
         try:
             return per_month.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         except InvalidOperation:
