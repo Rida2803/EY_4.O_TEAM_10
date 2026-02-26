@@ -1,5 +1,6 @@
 import json
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
+import math
 
 from django.contrib import messages
 from django.contrib.auth import login
@@ -13,6 +14,7 @@ from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.views.generic import CreateView, DeleteView, UpdateView
 
+
 from .forms import (
     UserRegistrationForm,
     TransactionForm,
@@ -23,6 +25,177 @@ from .forms import (
 )
 from .models import Transaction, MonthlyBudget
 from .models import SavingsGoal, AchievementBadge
+
+
+# ===== NEW HELPER FOR BUDGET EVALUATION =====
+def evaluate_budget(user):
+    """Return evaluation dict for the user's current monthly budget."""
+    from django.utils import timezone
+    from django.db.models import Sum
+
+    today = timezone.now().date()
+    month = today.month
+    year = today.year
+
+    mb = MonthlyBudget.objects.filter(user=user, month=month, year=year).first()
+    budget_amount = mb.budget_amount if mb else Decimal("0.00")
+
+    expenses = (
+        Transaction.objects.filter(
+            user=user,
+            type=Transaction.EXPENSE,
+            date__year=year,
+            date__month=month,
+        )
+        .aggregate(total=Sum("amount"))["total"]
+        or Decimal("0.00")
+    )
+
+    remaining = budget_amount - expenses
+    if expenses <= budget_amount:
+        status = "within_budget"
+        message = "Great job! You are managing your spending well this month."
+    else:
+        status = "exceeded"
+        message = "You have exceeded your budget."
+
+    top_categories = []
+    if status == "exceeded":
+        top_qs = (
+            Transaction.objects.filter(
+                user=user,
+                type=Transaction.EXPENSE,
+                date__year=year,
+                date__month=month,
+            )
+            .values("category")
+            .annotate(total=Sum("amount"))
+            .order_by("-total")[:2]
+        )
+        top_categories = [
+            dict(Transaction.CATEGORY_CHOICES).get(i["category"], "Other")
+            for i in top_qs
+        ]
+
+    return {
+        "budget": budget_amount,
+        "expenses": expenses,
+        "remaining": remaining,
+        "status": status,
+        "message": message,
+        "top_categories": top_categories,
+    }
+
+# ===== END BUDGET HELPER =====
+
+
+
+# ===== NEW HELPER FUNCTION FOR SAVINGS GOAL EMI PLANNING =====
+def calculate_goal_plan(goal, current_saved):
+    """
+    Intelligently calculate EMI plan for a savings goal.
+    
+    Args:
+        goal: SavingsGoal instance
+        current_saved: Decimal value of current savings towards goal
+    
+    Returns:
+        dict with keys:
+            - monthly_commitment: calculated/input monthly amount
+            - planned_months: calculated/input number of months
+            - remaining_to_save: amount still needed
+            - is_feasible: whether goal can be achieved
+            - expense_suggestions: list of category cuts if insufficient commitment
+    """
+    current_saved = Decimal(str(current_saved))
+    target = Decimal(str(goal.target_amount))
+    remaining = target - current_saved
+    
+    result = {
+        "monthly_commitment": goal.monthly_commitment or Decimal("0.00"),
+        "planned_months": goal.planned_months or 0,
+        "remaining_to_save": max(remaining, Decimal("0.00")),
+        "is_feasible": False,
+        "expense_suggestions": [],
+        "standard_emi_options": []  # 3, 6, 9, 12 months options
+    }
+    
+    if remaining <= 0:
+        result["is_feasible"] = True
+        result["planned_months"] = 0
+        result["monthly_commitment"] = Decimal("0.00")
+        return result
+    
+    # ===== If user provided planned_months, calculate monthly_commitment =====
+    if goal.planned_months and goal.planned_months > 0:
+        try:
+            monthly_needed = remaining / Decimal(str(goal.planned_months))
+            result["monthly_commitment"] = monthly_needed.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            result["planned_months"] = goal.planned_months
+            result["is_feasible"] = True
+        except Exception:
+            pass
+    
+    # ===== If user provided monthly_commitment, calculate planned_months =====
+    elif goal.monthly_commitment and goal.monthly_commitment > 0:
+        try:
+            commitment_decimal = Decimal(str(goal.monthly_commitment))
+            months_needed = math.ceil(float(remaining / commitment_decimal))
+            result["monthly_commitment"] = goal.monthly_commitment
+            result["planned_months"] = months_needed
+            result["is_feasible"] = True
+        except Exception:
+            pass
+    
+    # ===== Generate standard EMI options (3, 6, 9, 12 months) =====
+    for months in [3, 6, 9, 12]:
+        try:
+            # FIX: Convert months to string first to avoid Decimal InvalidOperation
+            emi = (remaining / Decimal(str(months))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            result["standard_emi_options"].append({
+                "months": months,
+                "monthly_commitment": emi
+            })
+        except Exception:
+            # Fallback: skip if calculation fails
+            pass
+    
+    # ===== INTELLIGENT SUGGESTION: Analyze expenses if insufficient commitment =====
+    if result["monthly_commitment"] > 0 and goal.user:
+        # Check top 2 expense categories
+        top_expenses = (
+            Transaction.objects.filter(user=goal.user, type=Transaction.EXPENSE)
+            .values("category")
+            .annotate(total=Sum("amount"))
+            .order_by("-total")[:2]
+        )
+        
+        # If we have expense data, suggest cuts
+        if top_expenses:
+            for top_expense in top_expenses:
+                try:
+                    category_name = dict(Transaction.CATEGORY_CHOICES).get(top_expense["category"], "Other")
+                    category_total = Decimal(str(top_expense["total"]))
+                    
+                    # Suggest 10% and 20% reduction
+                    cut_10_percent = (category_total * Decimal("0.10")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                    cut_20_percent = (category_total * Decimal("0.20")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                    
+                    result["expense_suggestions"].append({
+                        "category": category_name,
+                        "current_total": category_total,
+                        "cut_10_percent": cut_10_percent,
+                        "cut_20_percent": cut_20_percent,
+                        "remaining_after_10": category_total - cut_10_percent,
+                        "remaining_after_20": category_total - cut_20_percent,
+                    })
+                except Exception:
+                    pass
+    
+    return result
+# ===== END HELPER FUNCTION =====
+
+
 
 
 def register(request):
@@ -65,29 +238,14 @@ def dashboard(request):
     )
     current_balance = income_total - expense_total
 
-    monthly_budget, _ = MonthlyBudget.objects.get_or_create(
-    user=request.user,
-    month=month,
-    year=year,
-    defaults={
-        "budget_amount": Decimal("0.00")
-    }
-    )
-    budget_amount = monthly_budget.budget_amount if monthly_budget else Decimal("0.00")
-
-    month_expenses = user_transactions.filter(
-        type=Transaction.EXPENSE, date__year=year, date__month=month
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-
-    budget_usage_percentage = Decimal("0.00")
-    budget_exceeded = False
-    if budget_amount > 0:
-        budget_usage_percentage = (month_expenses / budget_amount) * 100
-        budget_exceeded = month_expenses > budget_amount
+    # REMOVED: Monthly budget calculations (monthly_budget, budget_amount, month_expenses, budget_usage_percentage, budget_exceeded)
 
     smart_form = SmartSpendingForm()
     advisor_result = None
     advisor_status = None
+
+    # projection feature removed
+    # (previous month and projection variables no longer used)
 
     if request.method == "POST":
         smart_form = SmartSpendingForm(request.POST)
@@ -114,6 +272,8 @@ def dashboard(request):
         else:
             messages.error(request, "Please enter a valid planned amount.")
 
+    # projection calculations removed; no longer applicable
+
     latest_transactions = user_transactions.select_related("user")[:5]
     # form for modal goal creation
     try:
@@ -121,14 +281,15 @@ def dashboard(request):
     except Exception:
         goal_form = None
     # base context (keeps core values separate from computed analytics)
+    # evaluate budget for new feature
+    budget_eval = evaluate_budget(request.user)
+
     base_context = {
         "income_total": income_total,
         "expense_total": expense_total,
         "current_balance": current_balance,
-        "monthly_budget": monthly_budget,
-        "budget_usage_percentage": float(budget_usage_percentage),
-        "budget_exceeded": budget_exceeded,
-        "month_expenses": month_expenses,
+        # keep the new evaluation dict
+        "budget_eval": budget_eval,
         "smart_form": smart_form,
         "advisor_result": advisor_result,
         "advisor_status": advisor_status,
@@ -185,18 +346,8 @@ def dashboard(request):
             return avg.quantize(Decimal("0.01"))
         except Exception:
             return Decimal("0.00")
-    predicted_income = rolling_avg(monthly_incomes)
-    predicted_expense = rolling_avg(monthly_expenses)
-    predicted_balance = (predicted_income - predicted_expense).quantize(Decimal("0.01"))
-
-    # month-over-month comparison (comparing last month to month before it)
-    mom_change = None
-    if len(monthly_expenses) >= 2:
-        # monthly_expenses[0] is the most recent past month, [1] is previous
-        prev = monthly_expenses[0]
-        prev_prev = monthly_expenses[1]
-        if prev_prev and prev_prev != Decimal("0.00"):
-            mom_change = ((prev - prev_prev) / prev_prev * 100).quantize(Decimal("0.01"))
+    
+    # REMOVED: Predicted balance calculations (predicted_income, predicted_expense, predicted_balance, mom_change)
 
     # top 3 spending categories
     top_categories_qs = (
@@ -312,12 +463,17 @@ def dashboard(request):
     if score_over_budget < Decimal("8.0"):
         suggestions.append("Reduce frequency of overspending months; automate small savings.")
 
-    # Goal intelligence - pick active goal if any
-    active_goal = SavingsGoal.objects.filter(user=request.user, end_date__gte=today_date).order_by("end_date").first()
+    # ===== UPDATED GOAL INTELLIGENCE - NO AUTO-ACHIEVEMENT =====
+    # Pick active goal if any (only if not manually completed)
+    active_goal = SavingsGoal.objects.filter(
+        user=request.user, 
+        end_date__gte=today_date,
+        is_completed=False  # NEW: Only show active, non-completed goals
+    ).order_by("end_date").first()
+    
     goal_info = None
     if active_goal:
-        required_monthly = active_goal.required_monthly_saving()
-        # compute already saved towards goal period
+        # Compute current saved towards goal period
         saved = (
             user_transactions.filter(type=Transaction.INCOME, date__gte=active_goal.start_date)
             .aggregate(total=Sum("amount"))["total"]
@@ -327,16 +483,30 @@ def dashboard(request):
             .aggregate(total=Sum("amount"))["total"]
             or Decimal("0.00")
         )
-        on_track = saved >= ((active_goal.target_amount / Decimal(max(active_goal.days_remaining, 1))) * Decimal(30))
+        saved = Decimal(str(saved))
+        
+        # ===== NEW: Check if sufficient balance without auto-completing =====
+        has_sufficient = active_goal.has_sufficient_balance(saved)
+        
+        # ===== NEW: Use helper to calculate EMI plan =====
+        goal_plan = calculate_goal_plan(active_goal, saved)
+        
         goal_info = {
             "name": active_goal.name,
             "target": active_goal.target_amount,
+            "current_saved": saved,
             "days_remaining": active_goal.days_remaining,
-            "required_monthly": required_monthly,
-            "saved": saved,
-            "on_track": on_track,
             "progress_pct": float((saved / active_goal.target_amount * Decimal('100.0')) if active_goal.target_amount and active_goal.target_amount > 0 else Decimal('0.0')),
+            # ===== NEW FIELDS =====
+            "has_sufficient_balance": has_sufficient,  # Show message instead of auto-complete
+            "remaining_to_save": goal_plan["remaining_to_save"],
+            "monthly_commitment": goal_plan["monthly_commitment"],
+            "planned_months": goal_plan["planned_months"],
+            "standard_emi_options": goal_plan["standard_emi_options"],  # 3, 6, 9, 12 months
+            "expense_suggestions": goal_plan["expense_suggestions"],  # Category cut recommendations
+            # ===== END NEW FIELDS =====
         }
+    # ===== END UPDATED GOAL INTELLIGENCE =====
 
     # Award simple badges
     def award_badge_if_needed(user, badge_key):
@@ -368,8 +538,7 @@ def dashboard(request):
 
     insights = []
     # Build a few natural insights
-    if mom_change is not None:
-        insights.append(f"Month-over-month expense change: {mom_change}%.")
+    # REMOVED: Month-over-month expense change insight (mom_change)
     if top_categories:
         insights.append(f"Top spending categories: {', '.join([c[0] for c in top_categories])}.")
     if spikes:
@@ -383,12 +552,7 @@ def dashboard(request):
         "health_color": health_color,
         "health_label": health_label,
         "health_suggestions": suggestions,
-        "predicted_income": predicted_income,
-        "predicted_expense": predicted_expense,
-        "predicted_balance": predicted_balance,
-        "financial_risk": (
-            "Low Risk" if predicted_balance >= Decimal("0.00") else "High Risk"
-        ),
+        # REMOVED: predicted_income, predicted_expense, predicted_balance, financial_risk
         "goal_info": goal_info,
         "badges": badges,
         "insights": insights,
@@ -469,7 +633,8 @@ def manage_budget(request):
     year = today.year
 
     monthly_budget, _ = MonthlyBudget.objects.get_or_create(
-        user=request.user, month=month, year=year
+        user=request.user, month=month, year=year,
+        defaults={"budget_amount": Decimal("0.00")},
     )
 
     if request.method == "POST":

@@ -84,10 +84,12 @@ class ReportFilterForm(forms.Form):
     )
 
 
+
+
 class SavingsGoalForm(forms.ModelForm):
     class Meta:
         model = SavingsGoal
-        fields = ["name", "target_amount", "start_date", "end_date"]
+        fields = ["name", "target_amount", "start_date", "end_date", "monthly_commitment", "planned_months"]
 
     def __init__(self, *args, **kwargs):
         # import model lazily to avoid circular import at module load
@@ -99,5 +101,21 @@ class SavingsGoalForm(forms.ModelForm):
         self.fields["target_amount"].widget.attrs.update({"class": "form-control", "step": "0.01"})
         self.fields["start_date"].widget.attrs.update({"class": "form-control", "type": "date"})
         self.fields["end_date"].widget.attrs.update({"class": "form-control", "type": "date"})
+        # ===== NEW FIELDS FOR EMI PLANNING =====
+        self.fields["monthly_commitment"].widget.attrs.update({
+            "class": "form-control",
+            "step": "0.01",
+            "placeholder": "Optional: Enter monthly commitment amount"
+        })
+        self.fields["monthly_commitment"].label = "Monthly Commitment (Optional)"
+        self.fields["monthly_commitment"].required = False
+        
+        self.fields["planned_months"].widget.attrs.update({
+            "class": "form-control",
+            "placeholder": "Optional: Enter number of months"
+        })
+        self.fields["planned_months"].label = "Planned Months (Optional)"
+        self.fields["planned_months"].required = False
+        # ===== END NEW FIELDS =====
     
 

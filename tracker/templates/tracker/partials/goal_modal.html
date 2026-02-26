@@ -1,5 +1,5 @@
 <div class="modal fade" id="goalModal" tabindex="-1" aria-labelledby="goalModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="goalModalLabel">Create Savings Goal</h5>
@@ -9,6 +9,8 @@
         <form id="goalModalForm" method="post" action="{% url 'tracker:goal_add' %}">
           {% csrf_token %}
           {{ form.non_field_errors }}
+          
+          <!-- ===== BASIC GOAL INFO ===== -->
           <div class="mb-3">
             {{ form.name.label_tag }}
             {{ form.name }}
@@ -31,6 +33,33 @@
               </div>
             </div>
           </div>
+          <!-- ===== END BASIC INFO ===== -->
+
+          <!-- ===== NEW: EMI PLANNING OPTIONS ===== -->
+          <hr class="my-3">
+          <h6 class="mb-3">EMI Planning (Optional)</h6>
+          <p class="small text-muted mb-3">
+            Choose either a monthly commitment amount <strong>OR</strong> number of months. 
+            We'll automatically calculate the other value.
+          </p>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                {{ form.monthly_commitment.label_tag }}
+                {{ form.monthly_commitment }}
+                <small class="form-text text-muted">e.g., ₹5,000 per month</small>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                {{ form.planned_months.label_tag }}
+                {{ form.planned_months }}
+                <small class="form-text text-muted">e.g., 12 months</small>
+              </div>
+            </div>
+          </div>
+          <!-- ===== END EMI OPTIONS ===== -->
         </form>
       </div>
       <div class="modal-footer">

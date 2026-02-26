@@ -81,6 +81,22 @@ class SavingsGoal(models.Model):
     start_date = models.DateField(default=timezone.now)
     end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    # ===== NEW FIELDS FOR EMI PLANNING =====
+    # User can input either monthly_commitment or planned_months, the other auto-calculates
+    monthly_commitment = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="User's planned monthly saving commitment"
+    )
+    planned_months = models.IntegerField(
+        null=True, blank=True,
+        help_text="Number of months to reach target"
+    )
+    is_completed = models.BooleanField(
+        default=False,
+        help_text="Manually marked as completed by user"
+    )
+    # ===== END EMI FIELDS =====
 
     class Meta:
         ordering = ["-created_at"]
@@ -91,6 +107,12 @@ class SavingsGoal(models.Model):
     @property
     def days_remaining(self) -> int:
         return max((self.end_date - timezone.now().date()).days, 0)
+    
+    # ===== NEW METHOD FOR CHECKING SUFFICIENT BALANCE =====
+    def has_sufficient_balance(self, current_saved: Decimal) -> bool:
+        """Check if current_saved >= target_amount"""
+        return Decimal(str(current_saved)) >= Decimal(str(self.target_amount))
+    # ===== END CHECK METHOD =====
 
     def required_monthly_saving(self) -> Decimal:
         remaining_days = self.days_remaining
